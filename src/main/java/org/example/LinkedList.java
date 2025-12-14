@@ -114,7 +114,7 @@ public class LinkedList<E> implements Iterable<E> {
     return sj.toString();
   }
 
-  class LinkedListIterator<E> implements ListIterator<E> {
+  public static class LinkedListIterator<E> implements ListIterator<E> {
     @NonNull
     final private LinkedList<E> list;
     @NonNull
@@ -254,7 +254,7 @@ public class LinkedList<E> implements Iterable<E> {
     }
   }
 
-  sealed interface LinkedListNode<E> permits Empty, Node {
+  public sealed interface LinkedListNode<E> permits Empty, Node {
     public boolean isEmpty();
     public boolean isPresent();
     public E getValue() throws NoSuchElementException;
@@ -272,7 +272,7 @@ public class LinkedList<E> implements Iterable<E> {
     }
   }
 
-  final static class Empty<E> implements LinkedListNode<E> {
+  public final static class Empty<E> implements LinkedListNode<E> {
     private static final Empty<Void> emptySingleton = new LinkedList.Empty();
 
     private Empty() {}
@@ -339,7 +339,7 @@ public class LinkedList<E> implements Iterable<E> {
   }
 
   @Data
-  final static class Node<E> implements LinkedListNode<E> {
+  public final static class Node<E> implements LinkedListNode<E> {
     @NonNull
     private LinkedListNode<E> previous;
     private E value;
