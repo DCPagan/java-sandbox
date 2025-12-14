@@ -1,9 +1,9 @@
 package org.example;
 
-import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.StringJoiner;
 
 import lombok.Data;
 import lombok.NonNull;
@@ -16,12 +16,12 @@ public class LinkedList<E> implements Iterable<E> {
   private LinkedListNode<E> lastNode;
 
   public <E> LinkedList() {
-    this.firstNode = Empty.getEmpty();
-    this.lastNode = Empty.getEmpty();
+    this.firstNode = LinkedListNode.empty();
+    this.lastNode = LinkedListNode.empty();
   }
 
   @Override
-  public Iterator<E> iterator() {
+  public ListIterator<E> iterator() {
     return new LinkedListIterator<>(this);
   }
 
@@ -74,12 +74,21 @@ public class LinkedList<E> implements Iterable<E> {
     }
   }
 
-  public LinkedList<E> of(Iterable<E> values) {
+  public static <E> LinkedList<E> of(Iterable<E> values) {
     LinkedList<E> list = new LinkedList<>();
     for (E value: values) {
       list.append(value);
     }
     return list;
+  }
+
+  @Override
+  public String toString() {
+    StringJoiner sj = new StringJoiner(", ", "[", "]");
+    for (E value: this) {
+      sj.add(value.toString());
+    }
+    return sj.toString();
   }
 }
 
@@ -92,25 +101,35 @@ class LinkedListIterator<E> implements ListIterator<E> {
 
   public LinkedListIterator(LinkedList<E> list) {
     this.list = list;
-    this.node = list.getFirstNode();
+    this.node = LinkedListNode.empty();
+    this.index = -1;
   }
 
   @Override
   public boolean hasNext() {
-    return node instanceof Node<E>;
+    try {
+      return index < 0
+        ? this.list.getFirstNode().isPresent()
+        : this.node.getNext().isPresent();
+    } catch (NoSuchElementException e) {
+      return false;
+    }
   }
 
   @Override
   public E next() throws NoSuchElementException {
+    this.node = index < 0
+      ? this.list.getFirstNode()
+      : this.node.getNext();
+    this.index++;
     E value = this.node.getValue();
-    this.node = this.node.getNext();
     return value;
   }
 
   @Override
   public boolean hasPrevious() {
     try {
-      return node.getPrevious() instanceof Node<E>;
+      return node.getPrevious().isPresent();
     } catch (NoSuchElementException e) {
       return false;
     }
@@ -124,6 +143,10 @@ class LinkedListIterator<E> implements ListIterator<E> {
 
   @Override
   public int nextIndex() {
+    return this.index + 1;
+  }
+
+  public int getIndex() {
     return this.index;
   }
 
@@ -134,42 +157,93 @@ class LinkedListIterator<E> implements ListIterator<E> {
 
   @Override
   public void remove() {
-    try {
-      this.node.getPrevious().setNext(this.node.getNext());
-    } catch (NoSuchElementException e) {}
-    try {
-      this.node.getNext().setPrevious(this.node.getPrevious());
-    } catch (NoSuchElementException e) {}
+    switch (this.node) {
+      case Empty _e -> {
+        throw new IllegalStateException(this.index < 0
+          ? "Iteration has not yet begun."
+          : "Iteration is over.");
+      }
+      case Node current -> {
+        switch (current.getPrevious()) {
+          case Empty _e -> {
+            this.list.setFirstNode(current.getNext());
+          }
+          case Node previous -> {
+            previous.setNext(current.getNext());
+          }
+        }
+        switch (current.getNext()) {
+          case Empty _e -> {
+            this.list.setLastNode(current.getPrevious());
+          }
+          case Node next -> {
+            next.setPrevious(current.getPrevious());
+          }
+        }
+      }
+    }
   }
 
   @Override
   public void set(E value) {
-    node.setValue(value);
+    if (node.isPresent()) {
+      node.setValue(value);
+    } else {
+      throw new IllegalStateException();
+    }
   }
 
   @Override
   public void add(E value) {
     LinkedListNode<E> n = new Node<>(value);
-    n.setNext(this.node);
-    try {
-      this.node.setPrevious(n);
-    } catch (NoSuchElementException e) {
-      this.list.setFirstNode(n);
-      this.list.setLastNode(n);
+    switch (this.node) {
+      case Empty _e -> {
+        if (index < 0) {
+          LinkedListNode<E> first = this.list.getFirstNode();
+          n.setNext(first);
+          first.setPrevious(n);
+          this.list.setFirstNode(n);
+        } else {
+          LinkedListNode<E> last = this.list.getLastNode();
+          n.setPrevious(last);
+          last.setNext(n);
+          this.list.setLastNode(n);
+          this.index++;
+        }
+      }
+      case Node current -> {
+        n.setPrevious(current);
+        n.setNext(current.getNext());
+        switch (current.getNext()) {
+          case Empty _e -> {
+            this.list.setLastNode(n);
+          }
+          case Node next -> {
+            next.setPrevious(n);
+          }
+        }
+        current.setNext(n);
+      }
     }
   }
 }
 
 sealed interface LinkedListNode<E> permits Empty, Node {
   public boolean isEmpty();
+  public boolean isPresent();
   public E getValue() throws NoSuchElementException;
   public void setValue(E value) throws NoSuchElementException;
   public LinkedListNode<E> getPrevious() throws NoSuchElementException;
   public Optional<LinkedListNode<E>> getPreviousOptional();
   public void setPrevious(LinkedListNode<E> value) throws NoSuchElementException;
+  public void setPreviousSafe(LinkedListNode<E> value);
   public LinkedListNode<E> getNext() throws NoSuchElementException;
   public Optional<LinkedListNode<E>> getNextOptional() ;
   public void setNext(LinkedListNode<E> value) throws NoSuchElementException;
+  public void setNextSafe(LinkedListNode<E> value);
+  public static <E> LinkedListNode<E> empty() {
+    return Empty.getEmpty();
+  }
 }
 
 final class Empty<E> implements LinkedListNode<E> {
@@ -184,6 +258,11 @@ final class Empty<E> implements LinkedListNode<E> {
   @Override
   public boolean isEmpty() {
     return true;
+  }
+
+  @Override
+  public boolean isPresent() {
+    return false;
   }
 
   @Override
@@ -212,6 +291,9 @@ final class Empty<E> implements LinkedListNode<E> {
   }
 
   @Override
+  public void setPreviousSafe(LinkedListNode<E> value) {}
+
+  @Override
   public LinkedListNode<E> getNext() throws NoSuchElementException {
     throw new NoSuchElementException();
   }
@@ -225,6 +307,9 @@ final class Empty<E> implements LinkedListNode<E> {
   public void setNext(LinkedListNode<E> value) throws NoSuchElementException {
     throw new NoSuchElementException();
   }
+
+  @Override
+  public void setNextSafe(LinkedListNode<E> value) {}
 }
 
 @Data
@@ -237,13 +322,18 @@ final class Node<E> implements LinkedListNode<E> {
 
   Node(E value) {
     this.value = value;
-    this.previous = (LinkedListNode<E>)Empty.getEmpty();
-    this.next = (LinkedListNode<E>)Empty.getEmpty();
+    this.previous = (LinkedListNode<E>)LinkedListNode.empty();
+    this.next = (LinkedListNode<E>)LinkedListNode.empty();
   }
 
   @Override
   public boolean isEmpty() {
     return false;
+  }
+
+  @Override
+  public boolean isPresent() {
+    return true;
   }
 
   @Override
@@ -272,6 +362,11 @@ final class Node<E> implements LinkedListNode<E> {
   }
 
   @Override
+  public void setPreviousSafe(LinkedListNode<E> previous) {
+    this.setPrevious(previous);
+  }
+
+  @Override
   public LinkedListNode<E> getNext() {
     return this.next;
   }
@@ -284,5 +379,10 @@ final class Node<E> implements LinkedListNode<E> {
   @Override
   public void setNext(LinkedListNode<E> next) {
     this.next = next;
+  }
+
+  @Override
+  public void setNextSafe(LinkedListNode<E> next) {
+    this.setNext(next);
   }
 }
