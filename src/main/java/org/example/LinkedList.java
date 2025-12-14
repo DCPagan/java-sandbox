@@ -4,6 +4,8 @@ import java.util.ListIterator;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.StringJoiner;
+import static java.util.stream.IntStream.range;
+import static java.util.stream.IntStream.rangeClosed;
 
 import lombok.Data;
 import lombok.NonNull;
@@ -46,7 +48,17 @@ public class LinkedList<E> implements Iterable<E> {
     return this.lastNode.getValue();
   }
 
-  public void prepend(E value) {
+  public void add(int i, E value) {
+    ListIterator<E> iter = this.iterator();
+    try {
+      range(0, i).forEach((int j) -> iter.next());
+      iter.add(value);
+    } catch (NoSuchElementException e) {
+      throw new IndexOutOfBoundsException();
+    }
+  }
+
+  public void addFirst(E value) {
     LinkedListNode<E>
       node = new Node<>(value),
       first = this.getFirstNode();
@@ -60,7 +72,7 @@ public class LinkedList<E> implements Iterable<E> {
     }
   }
 
-  public void append(E value) {
+  public void addLast(E value) {
     LinkedListNode<E>
       node = new Node<>(value),
       last = this.getLastNode();
@@ -74,10 +86,20 @@ public class LinkedList<E> implements Iterable<E> {
     }
   }
 
+  public void remove(int i) {
+    ListIterator<E> iter = this.iterator();
+    try {
+      rangeClosed(0, i).forEach((int j) -> iter.next());
+      iter.remove();
+    } catch (NoSuchElementException e) {
+      throw new IndexOutOfBoundsException();
+    }
+  }
+
   public static <E> LinkedList<E> of(Iterable<E> values) {
     LinkedList<E> list = new LinkedList<>();
     for (E value: values) {
-      list.append(value);
+      list.addLast(value);
     }
     return list;
   }
@@ -121,8 +143,8 @@ class LinkedListIterator<E> implements ListIterator<E> {
     this.node = index < 0
       ? this.list.getFirstNode()
       : this.node.getNext();
-    this.index++;
     E value = this.node.getValue();
+    this.index++;
     return value;
   }
 
@@ -138,6 +160,7 @@ class LinkedListIterator<E> implements ListIterator<E> {
   @Override
   public E previous() throws NoSuchElementException {
     this.node = this.node.getPrevious();
+    this.index--;
     return this.node.getValue();
   }
 
